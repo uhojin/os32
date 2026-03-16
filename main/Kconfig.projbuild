@@ -1,0 +1,20 @@
+menu "os32 Configuration"
+
+    menu "Spotify"
+        config SPOTIFY_CLIENT_ID
+            string "Spotify Client ID"
+            default ""
+            help
+                Client ID from your Spotify Developer Dashboard app.
+                Register at https://developer.spotify.com/dashboard
+
+        config SPOTIFY_REDIRECT_URI
+            string "Spotify OAuth Redirect URI"
+            default ""
+            help
+                The redirect URI configured in your Spotify app settings.
+                This should point to a static page that relays the auth
+                code back to the device. See docs/spotify-setup.md.
+    endmenu
+
+endmenu

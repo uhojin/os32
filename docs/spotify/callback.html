@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>os32 Spotify</title>
+<style>
+body {
+  background: #282828; color: #ebdbb2; font-family: monospace;
+  display: flex; justify-content: center; align-items: center;
+  height: 100vh; margin: 0;
+}
+.box { text-align: center; padding: 2em; max-width: 400px; }
+h1 { color: #b8bb26; margin-bottom: 0.5em; }
+.status { margin: 1em 0; }
+.error { color: #fb4934; }
+.success { color: #b8bb26; }
+.hint { color: #928374; font-size: 0.85em; margin-top: 1em; }
+input {
+  background: #3c3836; color: #ebdbb2; border: 1px solid #504945;
+  padding: 8px 12px; font-family: monospace; font-size: 1em;
+  width: 200px; text-align: center;
+}
+button {
+  background: #b8bb26; color: #282828; border: none;
+  padding: 8px 16px; font-family: monospace; font-size: 1em;
+  cursor: pointer; margin-left: 8px;
+}
+button:hover { background: #98971a; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>os32</h1>
+  <div id="content">
+    <p class="status">Connecting to device...</p>
+  </div>
+</div>
+<script>
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var code = params.get('code');
+  var error = params.get('error');
+  var content = document.getElementById('content');
+
+  if (error || !code) {
+    content.textContent = '';
+    var errP = document.createElement('p');
+    errP.className = 'error';
+    errP.textContent = 'Authorization failed.';
+    var hintP = document.createElement('p');
+    hintP.className = 'hint';
+    hintP.textContent = 'Try again from your device.';
+    content.appendChild(errP);
+    content.appendChild(hintP);
+    return;
+  }
+
+  // Try to forward the code to the ESP32 via mDNS redirect
+  var deviceHost = 'os32.local:8888';
+  var url = 'http://' + deviceHost + '/spotify-code?code=' + encodeURIComponent(code);
+
+  // Set a timeout — if redirect doesn't work (mDNS not available),
+  // show manual IP entry form
+  var fallbackTimer = setTimeout(showManual, 4000);
+
+  // Try direct redirect via mDNS
+  window.location.href = url;
+
+  function showManual() {
+    content.textContent = '';
+
+    var errP = document.createElement('p');
+    errP.className = 'error';
+    errP.textContent = 'Could not reach device automatically.';
+    content.appendChild(errP);
+
+    var instrP = document.createElement('p');
+    instrP.textContent = 'Enter your device IP and click Send:';
+    content.appendChild(instrP);
+
+    var formDiv = document.createElement('div');
+    formDiv.style.margin = '1em 0';
+
+    var input = document.createElement('input');
+    input.id = 'ip';
+    input.type = 'text';
+    input.placeholder = '192.168.1.x';
+    formDiv.appendChild(input);
+
+    var btn = document.createElement('button');
+    btn.textContent = 'Send';
+    btn.addEventListener('click', function() {
+      var ip = input.value.trim();
+      if (!ip) return;
+      window.location.href = 'http://' + ip + ':8888/spotify-code?code=' + encodeURIComponent(code);
+    });
+    formDiv.appendChild(btn);
+
+    content.appendChild(formDiv);
+
+    var hintP = document.createElement('p');
+    hintP.className = 'hint';
+    hintP.textContent = 'Find your IP in Settings > WiFi on the device.';
+    content.appendChild(hintP);
+  }
+})();
+</script>
+</body>
+</html>

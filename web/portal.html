@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>os32 WiFi Setup</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,system-ui,sans-serif;background:#282828;color:#ebdbb2;min-height:100vh;padding:20px}
+.container{max-width:400px;margin:0 auto}
+h1{color:#fabd2f;font-size:1.5rem;margin-bottom:4px}
+.subtitle{color:#928374;font-size:.85rem;margin-bottom:24px}
+.card{background:#3c3836;border-radius:8px;padding:16px;margin-bottom:16px}
+.card h2{color:#8ec07c;font-size:1rem;margin-bottom:12px}
+.network{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;margin:4px 0;border-radius:6px;cursor:pointer;transition:background .15s}
+.network:hover,.network.selected{background:#504945}
+.network.selected{border-left:3px solid #b8bb26}
+.network-name{font-size:.95rem}
+.network-rssi{color:#928374;font-size:.8rem}
+.rssi-good{color:#b8bb26}
+.rssi-ok{color:#fabd2f}
+.rssi-weak{color:#fb4934}
+label{display:block;color:#928374;font-size:.85rem;margin-bottom:6px}
+input[type="password"],input[type="text"]{width:100%;padding:10px 12px;background:#504945;border:1px solid #665c54;border-radius:6px;color:#ebdbb2;font-size:.95rem;outline:none}
+input:focus{border-color:#8ec07c}
+.btn{display:block;width:100%;padding:12px;border:none;border-radius:6px;font-size:1rem;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn:hover{opacity:.9}
+.btn-primary{background:#b8bb26;color:#282828}
+.btn-scan{background:#504945;color:#ebdbb2;margin-bottom:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.status{text-align:center;padding:20px}
+.status .icon{font-size:2rem;margin-bottom:8px}
+.status .msg{color:#928374}
+.spinner{display:inline-block;width:20px;height:20px;border:2px solid #504945;border-top-color:#b8bb26;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none}
+.toggle-pw{color:#928374;font-size:.8rem;cursor:pointer}
+.toggle-pw:hover{color:#ebdbb2}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>os32</h1>
+<p class="subtitle">WiFi Setup</p>
+
+<div id="view-scan">
+<div class="card">
+<h2>Available Networks</h2>
+<button class="btn btn-scan" onclick="scan()">Scan for Networks</button>
+<div id="networks"></div>
+</div>
+
+<div class="card hidden" id="pw-card">
+<h2>Connect to <span id="selected-ssid"></span></h2>
+<div>
+<div style="display:flex;justify-content:space-between;align-items:baseline"><label for="pw">Password</label><span class="toggle-pw" onclick="togglePw()">show</span></div>
+<input type="password" id="pw" name="wifi-password" placeholder="Enter WiFi password" autocomplete="current-password">
+</div>
+<div style="height:12px"></div>
+<button class="btn btn-primary" id="btn-connect" onclick="doConnect()">Connect</button>
+</div>
+</div>
+
+<div id="view-connecting" class="hidden">
+<div class="card">
+<div class="status">
+<div class="spinner"></div>
+<p class="msg" style="margin-top:12px">Connecting...</p>
+<p class="msg" id="connect-ssid"></p>
+</div>
+</div>
+</div>
+
+<div id="view-success" class="hidden">
+<div class="card">
+<div class="status">
+<div class="icon" style="color:#b8bb26">&#10003;</div>
+<p style="color:#b8bb26;font-size:1.1rem;margin-bottom:8px">Connected!</p>
+<p class="msg" id="success-info"></p>
+</div>
+</div>
+</div>
+
+<div id="view-failed" class="hidden">
+<div class="card">
+<div class="status">
+<div class="icon" style="color:#fb4934">&#10007;</div>
+<p style="color:#fb4934;font-size:1.1rem;margin-bottom:8px">Connection Failed</p>
+<p class="msg">Check password and try again.</p>
+<br>
+<button class="btn btn-scan" onclick="showScan()">Try Again</button>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+let selectedSsid='';
+function $(id){return document.getElementById(id)}
+
+function show(id){
+  document.querySelectorAll('[id^="view-"]').forEach(function(e){e.classList.add('hidden')});
+  $(id).classList.remove('hidden');
+}
+
+function showScan(){show('view-scan');$('pw-card').classList.add('hidden');selectedSsid='';scan()}
+
+function setLoading(el){
+  el.textContent='';
+  var s=document.createElement('div');s.className='status';
+  var sp=document.createElement('div');sp.className='spinner';s.appendChild(sp);
+  var p=document.createElement('p');p.className='msg';p.textContent='Scanning...';s.appendChild(p);
+  el.appendChild(s);
+}
+
+function setEmpty(el){
+  el.textContent='';
+  var s=document.createElement('div');s.className='status';
+  var p=document.createElement('p');p.className='msg';p.textContent='No networks found';s.appendChild(p);
+  el.appendChild(s);
+}
+
+function setError(el){
+  el.textContent='';
+  var s=document.createElement('div');s.className='status';
+  var p=document.createElement('p');p.className='msg';p.textContent='Scan failed';s.appendChild(p);
+  el.appendChild(s);
+}
+
+function rssiClass(r){return r>-50?'rssi-good':r>-70?'rssi-ok':'rssi-weak'}
+function rssiLabel(r){return r>-50?'Strong':r>-70?'Good':'Weak'}
+
+function createNetworkEl(net){
+  var div=document.createElement('div');
+  div.className='network';
+  if(net.ssid===selectedSsid)div.classList.add('selected');
+  var name=document.createElement('span');
+  name.className='network-name';
+  name.textContent=net.ssid+(net.auth?' \u{1F512}':'');
+  var rssi=document.createElement('span');
+  rssi.className='network-rssi '+rssiClass(net.rssi);
+  rssi.textContent=rssiLabel(net.rssi);
+  div.appendChild(name);
+  div.appendChild(rssi);
+  div.addEventListener('click',function(){pick(net.ssid,div)});
+  return div;
+}
+
+async function scan(){
+  var el=$('networks');
+  setLoading(el);
+  try{
+    var r=await fetch('/api/scan');
+    var nets=await r.json();
+    el.textContent='';
+    if(!nets.length){setEmpty(el);return}
+    nets.forEach(function(n){el.appendChild(createNetworkEl(n))});
+  }catch(e){setError(el)}
+}
+
+function pick(ssid,el){
+  selectedSsid=ssid;
+  document.querySelectorAll('.network').forEach(function(e){e.classList.remove('selected')});
+  el.classList.add('selected');
+  $('selected-ssid').textContent=ssid;
+  $('pw-card').classList.remove('hidden');
+  $('pw').focus();
+}
+
+function togglePw(){
+  var p=$('pw');
+  p.type=p.type==='password'?'text':'password';
+  event.target.textContent=p.type==='password'?'show':'hide';
+}
+
+async function doConnect(){
+  var pw=$('pw').value;
+  if(!selectedSsid)return;
+  show('view-connecting');
+  $('connect-ssid').textContent=selectedSsid;
+  try{
+    await fetch('/api/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssid:selectedSsid,password:pw})});
+    setTimeout(pollStatus,3000);
+  }catch(e){show('view-failed')}
+}
+
+var pollCount=0;
+async function pollStatus(){
+  try{
+    var r=await fetch('/api/status');
+    var s=await r.json();
+    if(s.state==='connected'){$('success-info').textContent=s.ssid+' \u2014 '+s.ip;show('view-success');return}
+    if(s.state==='failed'){show('view-failed');return}
+  }catch(e){}
+  if(++pollCount<10)setTimeout(pollStatus,2000);
+  else show('view-failed');
+}
+
+scan();
+</script>
+</body>
+</html>
