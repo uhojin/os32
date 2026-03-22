@@ -198,8 +198,9 @@ The Spotify app uses OAuth 2.0 PKCE for authentication — no client secret need
 The ESP32 can't receive HTTPS callbacks directly. A static HTML page acts as a relay:
 
 1. Fork this repo and enable GitHub Pages (Settings > Pages > Source: deploy from `main` branch, `/docs` folder)
-2. Set your Pages URL (e.g. `https://yourusername.github.io/os32/spotify/callback.html`) as the redirect URI in the Spotify app settings
-3. The page receives the auth code from Spotify and forwards it to the device on the local network
+2. Delete the `docs/CNAME` file from your fork (or update it with your own custom domain)
+3. Set your Pages URL (e.g. `https://yourusername.github.io/os32/spotify/callback.html`) as the redirect URI in the Spotify app settings
+4. The page receives the auth code from Spotify and forwards it to the device on the local network
 
 ### 3. Configure & Connect
 
